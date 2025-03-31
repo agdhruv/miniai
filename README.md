@@ -1,47 +1,70 @@
-# MiniAI
+# MiniAI 
 
 A minimalist Python library for byte-sized AI tasks. No complex chains, no confusing abstractions, just AI that works.
 
+```bash
+pip install miniai
+```
+
 ## The Problem
 
-Using AI models for simple tasks comes with too much overhead:
-- Writing boilerplate API calls
-- Managing prompts and message lists
-- Configuring providers and models
-- Learning complex frameworks like LangChain
+Using AI models for simple tasks comes with too much overhead: Writing boilerplate API calls, managing prompts and message lists, configuring providers and models, learning complex frameworks like LangChain.
 
-These barriers make it difficult to quickly prototype and integrate AI capabilities into your workflow.
+These barriers make it annoying to quickly prototype and integrate AI capabilities into your workflow.
 
 ## The Solution
 
-MiniAI provides a dead-simple interface for common AI tasks:
+MiniAI provides a dead-simple interface for common AI tasks.
 
 ```python
 from miniai import ai
 
-# Simple tasks with just one line
 text = ai.ask("Write a haiku about Python")
+```
+
+`ai.ask()` is a powerful function that can do anything. But here are some helper functions for common tasks:
+```python
+image_analysis = ai.ask("What's in this image?", images=["image.png", "https://example.com/image.png"])
+
 category = ai.classify("I love this product!", ["positive", "negative", "neutral"])
+
 entities = ai.extract("Apple was founded by Steve Jobs in 1976", ["people", "organizations", "dates"])
-summary = ai.summarize("Very long text goes here...")
+
+summary = ai.summarize("Very long text")
+
 translated = ai.translate("Hello world", to="spanish")
-answer = ai.ask("Who was Ada Lovelace?")
-image_analysis = ai.ask("What's in this image?", images=["Logo.png"])
-image_url_analysis = ai.ask("What's in this image?", images=["https://example.com/image.jpg"])
 
-# Configure once, use anywhere
-ai.set_api_key("openai", "your-api-key-here")  # Or use environment variables
-ai.use("anthropic")  # Switch providers dynamically
-ai.set_model("gpt-4-turbo")  # Set model for current provider
+audio = ai.text_to_speech("Hello world")
 
-# Mock mode for testing without API keys
-ai.config.mock(True)
-result = ai.ask("This will return a mock response")  # No API key needed
+text = ai.speech_to_text(audio) # Transcription
+```
+
+See more examples in the [examples](examples) directory.
+
+## Intuitive and Flexible
+
+The only terminology you need to know is "provider" and "model". A provider is an AI service/company like OpenAI or Anthropic. A model is a specific AI model like GPT-4o or Claude 3.5.
+
+The defaults will usually get your work done, but if you need more control, it's super intuitive. Need a different provider? A different model? A system prompt? Additional settings? just pass a parameter to `ai.ask()`.
+
+```python
+text = ai.ask("Write a haiku about Python", system="Respond in Spanish") # uses gpt-4o from openai by default
+
+text = ai.ask("Write a haiku about Python", provider="anthropic")
+
+text = ai.ask("Write a haiku about Python", provider="openai", model="gpt-3.5-turbo", temperature=0.5, max_tokens=100)
+```
+
+If you need the raw response from the provider, just pass `raw_response=True`.
+```python
+response = ai.ask("Write a haiku about Python", raw_response=True)
+print(response.content) # The text answer
+print(response.raw_response) # Full provider response
 ```
 
 ## Turn Any Function into an AI Function
 
-The most powerful feature is the function decorator:
+The function decorator is a powerful way to turn any function into an AI function.
 
 ```python
 @ai.function
@@ -59,65 +82,56 @@ def write_code(task, language):
 code = write_code("sort a list", "python")
 ```
 
-## Installation
-
-```bash
-pip install miniai
-```
-
 ## Why Choose MiniAI?
 
 - 🚀 **Simple API**: Just one import, intuitive methods
 - 🔧 **Zero configuration**: Works out of the box (with environment variables)
 - 🧠 **Smart defaults**: Uses appropriate models for each task
-- 🔄 **Model agnostic**: Works with OpenAI, Anthropic, and more
+- 🔄 **Model agnostic**: Works with OpenAI, Anthropic, and more coming soon
 - 📦 **Lightweight**: No heavy dependencies
 - 🧩 **Extensible**: Easy to add new providers and tasks
-- 🧪 **Test-friendly**: Mock mode for development without API keys
 
 ## API Reference
 
 ### Core Functions
 
-- `ai.ask(question, format_instructions=None, images=None, raw_response=False, **kwargs)` - Answer a question, optionally with images and format instructions
-- `ai.classify(text, categories, raw_response=False, **kwargs)` - Classify text into categories
-- `ai.extract(text, entities, raw_response=False, **kwargs)` - Extract entities from text
-- `ai.summarize(text, raw_response=False, **kwargs)` - Summarize text
-- `ai.translate(text, to, raw_response=False, **kwargs)` - Translate text to another language
-- `ai.embedding(text, raw_response=False, **kwargs)` - Get embedding vector for text
-- `ai.text_to_speech(text, raw_response=False, **kwargs)` - Convert text to speech (OpenAI only)
-- `ai.speech_to_text(audio_data, raw_response=False, **kwargs)` - Convert speech to text (OpenAI only)
+| Function | Description |
+|----------|-------------|
+| `ai.ask(question, format_instructions=None, images=None, raw_response=False, **kwargs)` | Answer a question, optionally with images and format instructions |
+| `ai.classify(text, categories, raw_response=False, **kwargs)` | Classify text into categories |
+| `ai.extract(text, entities, raw_response=False, **kwargs)` | Extract entities from text |
+| `ai.summarize(text, raw_response=False, **kwargs)` | Summarize text |
+| `ai.translate(text, to, raw_response=False, **kwargs)` | Translate text to another language |
+| `ai.embedding(text, raw_response=False, **kwargs)` | Get embedding vector for text |
+| `ai.text_to_speech(text, raw_response=False, **kwargs)` | Convert text to speech (OpenAI only) |
+| `ai.speech_to_text(audio_data, raw_response=False, **kwargs)` | Convert speech to text (OpenAI only) |
 
-### Configuration
-
-- `ai.set_api_key(provider, key)` - Set API key for a provider
-- `ai.use(provider)` - Switch to a different provider
-    - `ai.use('mock')` - Use the mock provider for testing
-- `ai.set_model(model, provider=None)` - Set model for current or specified provider
-- `ai.get_active_provider()` - Get current provider
-- `ai.get_available_providers()` - List all available providers
-
-### Response Format
-
-By default, all functions return the processed response that makes sense for the task (e.g. a string for text generation, a list of entities for entity extraction, etc.).
-
-All functions also support a `raw_response` parameter that returns a `Response` object with:
+A note on the `raw_response` parameter: By default, all functions return the processed response that makes sense for the task (e.g. a string for text generation, a list of entities for entity extraction, etc.). If you need the raw response from the provider, just pass `raw_response=True` to any function. This will return a `Response` object with:
 - `content`: The processed response
 - `raw_response`: The complete response from the provider
 
-Example:
-```python
-response = ai.ask("What is the capital of France?", raw_response=True)
-print(response.content)  # The text answer
-print(response.raw_response)  # Full provider response
-```
+### Configuration
 
-More examples in the [examples](examples) directory.
+| Function | Description |
+|----------|-------------|
+| `ai.set_api_key(provider, key)` | Set API key for a provider |
+| `ai.use(provider)` | Switch to a different provider |
+| `ai.set_model(model, provider=None)` | Set model for current or specified provider |
+| `ai.get_active_provider()` | Get current provider |
+| `ai.get_available_providers()` | List all available providers |
 
-## Decorator
+> **Note:** Use `ai.use('mock')` to enable the mock provider for testing without API keys.
 
-- `@ai.function(system_prompt=None)` - Turn any function into an AI function
+### Decorator
+
+| Decorator | Description |
+|-----------|-------------|
+| `@ai.function(system_prompt=None)` | Turn any function into an AI function |
 
 ## License
 
 MIT
+
+## Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for step-by-step guidelines.
