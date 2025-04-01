@@ -68,8 +68,8 @@ class MockProvider(BaseProvider):
         mock_response = {"choices": [{"message": {"content": result}}]}
         return Response(result, mock_response) if raw_response else result
     
-    def ask(self, question: str, *, format_instructions: Optional[str] = None, images: Optional[List[Union[str, bytes]]] = None, raw_response: bool = False, **kwargs) -> Union[str, Response]:
-        """Return a mock answer, optionally with structured output."""
+    def _ask(self, question: Optional[str] = None, *, system_prompt: Optional[str] = None, messages: Optional[List[Dict]] = None, format_instructions: Optional[str] = None, images: List[Union[str, bytes]] = None, raw_response: bool = False, **kwargs) -> Union[str, Response]:
+        """Return a mock answer, optionally with conversation history or structured output."""
         if images:
             result = "This is a mock response for an image-based query."
         elif format_instructions is None:

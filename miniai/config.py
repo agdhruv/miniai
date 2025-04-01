@@ -44,7 +44,7 @@ class Config:
         key = self.api_keys.get(provider, "")
         if not key:
             raise ValueError(f"No API key found for provider {provider}. "
-                             f"Set it with ai.set_api_key('{provider.upper()}', 'your-key') or set the environment variable {provider.upper()}_API_KEY")
+                             f"Set it with ai.set_api_key('{provider}', 'your-key') or set the environment variable '{provider.upper()}_API_KEY'")
         return key
     
     def set_model(self, model: str, provider: Optional[str] = None) -> None:

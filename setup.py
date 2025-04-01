@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="miniai",
-    version="0.1.0",
+    version="0.1.1",
     author="Dhruv Agarwal",
     author_email="dhruv_agarwal@outlook.com",
     description="A minimalist Python library for byte-sized AI tasks",

@@ -74,19 +74,25 @@ class AI:
         provider = kwargs.pop("provider", None)
         return self._get_provider(provider).translate(text, to, raw_response=raw_response, **kwargs)
     
-    def ask(self, question: str, *, format_instructions: Optional[str] = None, images: Optional[List[Union[str, bytes]]] = None, raw_response: bool = False, **kwargs) -> Union[str, Response]:
+    def ask(self, question: Optional[str] = None, *, system_prompt: Optional[str] = None, messages: Optional[List[Dict]] = None, format_instructions: Optional[str] = None, images: Optional[List[Union[str, bytes]]] = None, raw_response: bool = False, **kwargs) -> Union[str, Response]:
         """Answer a question, optionally with structured output and images.
         
         Args:
-            question: The question or instruction to answer
+            question: The question or instruction to answer (mutually exclusive with messages)
+            system_prompt: Optional system prompt to guide the AI
+            messages: Optional list of message dicts for conversation history (mutually exclusive with question)
             format_instructions: Optional instructions for how to format the response
                                 (e.g. "Return JSON with {person: true/false, animal: true/false}")
             images: Optional list of image data (file paths or bytes)
             raw_response: Whether to return the full response object
             **kwargs: Additional arguments to pass to the provider
-            
+                max_tokens: Maximum tokens to generate
+                temperature: Temperature for response randomness
+                top_p: Top-p for response randomness
+                Other provider-specific parameters
+                
         Returns:
-            The response (formatted as specified by format_instructions) or Response object
+            The response or Response object
             
         Example:
             # Regular question
@@ -111,7 +117,7 @@ class AI:
             print(response.raw_response)  # The full provider response
         """
         provider = kwargs.pop("provider", None)
-        return self._get_provider(provider).ask(question, format_instructions=format_instructions, images=images, raw_response=raw_response, **kwargs)
+        return self._get_provider(provider).ask(question, system_prompt=system_prompt, messages=messages, format_instructions=format_instructions, images=images, raw_response=raw_response, **kwargs)
     
     def embedding(self, text: str, *, raw_response: bool = False, **kwargs) -> Union[List[float], Response]:
         """Get embedding vector for the given text.
@@ -171,22 +177,47 @@ class AI:
         provider = kwargs.pop("provider", None)
         return self._get_provider(provider).speech_to_text(audio_data, raw_response=raw_response, **kwargs)
     
-    def function(self, func: Optional[Callable] = None, *, system_prompt: Optional[str] = None):
+    def function(self, func: Optional[Callable] = None, *, system_prompt: Optional[str] = None, messages: Optional[List[Dict]] = None, format_instructions: Optional[str] = None, images: Optional[List[Union[str, bytes]]] = None, raw_response: bool = False, **kwargs):
         """Decorator to convert a function to use AI for its implementation.
         
+        Args:
+            func: The function to decorate
+            system_prompt: Optional system prompt to guide the AI
+            messages: Optional list of message dicts for conversation history
+            format_instructions: Optional instructions for how to format the response
+            images: Optional list of image data (file paths or bytes)
+            raw_response: Whether to return the full response object
+            **kwargs: Additional arguments to pass to the provider
+            
         Example:
+            # Basic usage
             @ai.function
             def generate_poem(topic, style):
                 '''Generate a poem about {topic} in the style of {style}.'''
+                
+            # With system prompt
+            @ai.function(system_prompt="You are a creative poet.")
+            def write_haiku(topic):
+                '''Write a haiku about {topic}.'''
+                
+            # With format instructions
+            @ai.function(format_instructions="Return in JSON format with 'poem' and 'analysis' keys.")
+            def analyze_poem(poem):
+                '''Analyze this poem: {poem}'''
+                
+            # With images
+            @ai.function(images=["image.jpg"])
+            def describe_image():
+                '''Describe what you see in this image.'''
         """
         def decorator(func):
             @functools.wraps(func)
-            def wrapper(*args, **kwargs):
+            def wrapper(*args, **wrapper_kwargs):
                 # Get function signature and docstring
                 sig = func.__doc__ or func.__name__
                 
                 # Replace placeholders in the docstring with actual arguments
-                if args:
+                if args or wrapper_kwargs: # Check both args and kwargs
                     # Get parameter names from function definition
                     import inspect
                     param_names = list(inspect.signature(func).parameters.keys())
@@ -195,7 +226,7 @@ class AI:
                     args_dict = dict(zip(param_names, args))
                     
                     # Update with any keyword arguments
-                    args_dict.update(kwargs)
+                    args_dict.update(wrapper_kwargs)
                     
                     # Format the docstring with the arguments
                     try:
@@ -206,11 +237,17 @@ class AI:
                 
                 # Build the prompt
                 prompt = sig
-                if system_prompt:
-                    kwargs["system"] = system_prompt
                 
-                # Call the AI
-                return self.ask(prompt, **kwargs)
+                # Call the AI with all parameters, passing only decorator's kwargs
+                return self.ask(
+                    prompt,
+                    system_prompt=system_prompt,
+                    messages=messages,
+                    format_instructions=format_instructions,
+                    images=images,
+                    raw_response=raw_response,
+                    **kwargs # Pass ONLY the decorator's kwargs here
+                )
             
             return wrapper
         

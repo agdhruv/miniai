@@ -8,9 +8,6 @@ class Response:
         self.content = content
         self.raw_response = raw_response
     
-    def __str__(self) -> str:
-        return str(self.content)
-    
     def __repr__(self) -> str:
         return f"Response(content={repr(self.content)}, raw_response={repr(self.raw_response)})"
 
@@ -56,7 +53,22 @@ class BaseProvider:
         result = response.content.strip()
         return Response(result, response.raw_response) if raw_response else result
     
-    def ask(self, question: str, *, format_instructions: Optional[str] = None, images: Optional[List[Union[str, bytes]]] = None, raw_response: bool = False, **kwargs) -> Union[str, Response]:
+    def ask(self, question: Optional[str] = None, *, system_prompt: Optional[str] = None, messages: Optional[List[Dict]] = None, format_instructions: str = None, images: List[Union[str, bytes]] = None, raw_response: bool = False, **kwargs) -> Union[str, Response]:
+        """Answer a question using the provider."""
+        
+        # Do some basic validation before delegating to the provider
+        if question is None and messages is None: # Neither provided
+            raise ValueError("Must provide at least one of 'question' or 'messages' parameter")
+        
+        if question is not None and messages is not None: # Both provided
+            raise ValueError("Cannot provide both 'question' and 'messages' parameters")
+        
+        if messages is not None and images is not None: # Images and messages provided
+            raise ValueError("Cannot provide both 'images' and 'messages' parameters. When providing a message list, you must include the images in list yourself.")
+        
+        return self._ask(question, system_prompt=system_prompt, messages=messages, format_instructions=format_instructions, images=images, raw_response=raw_response, **kwargs)
+
+    def _ask(self, question: Optional[str] = None, *, system_prompt: Optional[str] = None, messages: Optional[List[Dict]] = None, format_instructions: str = None, images: List[Union[str, bytes]] = None, raw_response: bool = False, **kwargs) -> Union[str, Response]:
         """Answer a question using the provider."""
         raise NotImplementedError
     

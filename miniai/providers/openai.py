@@ -31,70 +31,86 @@ class OpenAIProvider(BaseProvider):
         result = response.data[0].embedding
         return Response(result, response) if raw_response else result
     
-    def ask(self, question: str, *, format_instructions: Optional[str] = None, images: Optional[List[Union[str, bytes]]] = None, raw_response: bool = False, **kwargs) -> Union[str, Response]:
-        """Answer a question using OpenAI, optionally with images.
+    def _ask(self, question: Optional[str] = None, *, system_prompt: Optional[str] = None, messages: Optional[List[Dict]] = None, format_instructions: str = None, images: List[Union[str, bytes]] = None, raw_response: bool = False, **kwargs) -> Union[str, Response]:
+        """Answer a question using OpenAI, optionally with conversation history.
         
         Args:
-            question: The question or instruction to answer
+            question: A string with the question to answer (mutually exclusive with messages)
+            system_prompt: Optional system prompt to guide the AI
+            messages: A list of message dicts for conversation history (mutually exclusive with question)
             format_instructions: Optional instructions for how to format the response
             images: Optional list of image data (file paths, URLs, or bytes)
             raw_response: Whether to return the full response object
             **kwargs: Additional arguments to pass to the provider
         """
+        # If system prompt is provided both in kwargs and in the messages list, raise an error
+        if messages is not None:
+            is_system_prompt_in_messages = [message for message in messages if message["role"] == "system"]
+            if is_system_prompt_in_messages and system_prompt is not None:
+                raise ValueError("You have provided a system prompt both in the 'messages' list and in the 'system_prompt' parameter. This seems like a mistake as you cannot have two system prompts.")
+        
         client = self._get_client()
         model = kwargs.pop("model", self.config.get_model("openai"))
         
-        # Handle system prompt if provided
-        messages = []
-        if "system" in kwargs:
-            system_prompt = kwargs.pop("system")
-            messages.append({"role": "system", "content": system_prompt})
-            
-        # Handle images if provided
-        if images:
-            content = [{"type": "text", "text": question}]
-            for img in images:
-                if isinstance(img, str):
-                    if img.startswith(('http://', 'https://')):
-                        # Handle URL
-                        content.append({
-                            "type": "image_url",
-                            "image_url": {"url": img}
-                        })
+        if messages is not None:
+            messages_list = []
+            # We're guaranteed (see the validation above) that there is no system prompt in the messages list,
+            # so we can safely add the system prompt to the beginning of the list if it's provided
+            if system_prompt is not None:
+                messages_list += [{"role": "system", "content": system_prompt}]
+            # Add the message list provided by the user as is
+            messages_list += messages
+        else:
+            # Create a new messages list from the question string
+            messages_list = []
+            if system_prompt is not None:
+                messages_list.append({"role": "system", "content": system_prompt})
+                
+            # Handle images if provided
+            if images:
+                content = [{"type": "text", "text": question}]
+                for img in images:
+                    if isinstance(img, str):
+                        if img.startswith(('http://', 'https://')):
+                            # Handle URL
+                            content.append({
+                                "type": "image_url",
+                                "image_url": {"url": img}
+                            })
+                        else:
+                            # Handle file path
+                            import base64
+                            with open(img, "rb") as f:
+                                img_data = base64.b64encode(f.read()).decode("utf-8")
+                            content.append({
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{img_data}"
+                                }
+                            })
                     else:
-                        # Handle file path
+                        # Handle bytes
                         import base64
-                        with open(img, "rb") as f:
-                            img_data = base64.b64encode(f.read()).decode("utf-8")
+                        img_data = base64.b64encode(img).decode("utf-8")
                         content.append({
                             "type": "image_url",
                             "image_url": {
                                 "url": f"data:image/jpeg;base64,{img_data}"
                             }
                         })
-                else:
-                    # Handle bytes
-                    import base64
-                    img_data = base64.b64encode(img).decode("utf-8")
-                    content.append({
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/jpeg;base64,{img_data}"
-                        }
-                    })
-            messages.append({"role": "user", "content": content})
-        else:
-            messages.append({"role": "user", "content": question})
+                messages_list.append({"role": "user", "content": content})
+            else:
+                messages_list.append({"role": "user", "content": question})
         
         # Add format instructions if provided
         if format_instructions:
-            messages.append({"role": "user", "content": format_instructions})
+            messages_list.append({"role": "user", "content": format_instructions})
             if "json" in format_instructions.lower():
                 kwargs["response_format"] = {"type": "json_object"}
         
         response = client.chat.completions.create(
             model=model,
-            messages=messages,
+            messages=messages_list,
             **kwargs
         )
         
